@@ -84,7 +84,7 @@ if __name__ == '__main__':
     args.view = False
 
     if args.view:
-        viewer = Viewer()
+        pass # viewer = Viewer()
     else:
         viewer = None
 

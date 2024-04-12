@@ -455,7 +455,7 @@ class MSCKF(object):
         
         # Fill in the augmented state covariance.
         P11 = state_cov[:21, :21]
-        state_cov[old_rows:, :old_rows] = J @ P11
+        state_cov[old_rows:, :old_rows] = J @ state_cov[:21, :old_rows]
         state_cov[:old_rows, old_rows:] = state_cov[old_rows:, :old_rows].T
         state_cov[old_rows:, old_rows:] = J @ P11 @ J.T
 
