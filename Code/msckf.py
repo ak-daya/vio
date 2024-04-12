@@ -251,27 +251,39 @@ class MSCKF(object):
         self.state_server.imu_state.orientation = to_quaternion(np.transpose(to_rotation(q0_i_w)))
     
     # Filter related functions (batch_imu_processing, process_model, predict_new_state)
+    # Implement this
     def batch_imu_processing(self, time_bound):
         """
-        IMPLEMENT THIS!!!!!
-        """
-        """
         Process the imu message given the time bound
-        """
+        """        
         # Process the imu messages in the imu_msg_buffer 
         # Execute process model.
         # Update the state info
         # Repeat until the time_bound is reached
-        ...
+        used_imu_msg_cntr = 0
+
+        for imu_msg in self.imu_msg_buffer:
+            imu_time = imu_msg.timestamp
+            if (imu_time < self.state_server.imu_state.timestamp):
+                used_imu_msg_cntr += 1
+                continue
+            if (imu_time > time_bound):
+                break
+        
+        angular_vel = imu_msg.angular_velocity
+        linear_acc = imu_msg.linear_acceleration
+        
+        self.process_model(imu_time, angular_vel, linear_acc)
+        used_imu_msg_cntr += 1
         
         # Set the current imu id to be the IMUState.next_id
-        ...
+        self.state_server.imu_state.id = IMUState.next_id
         
         # IMUState.next_id increments
-        ...
+        IMUState.next_id += 1
 
         # Remove all used IMU msgs.
-        ...
+        self.imu_msg_buffer = self.imu_msg_buffer[used_imu_msg_cntr:]
 
     def process_model(self, time, m_gyro, m_acc):
         """
