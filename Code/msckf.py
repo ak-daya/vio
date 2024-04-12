@@ -222,27 +222,34 @@ class MSCKF(object):
             # Reset the system if necessary.
             self.online_reset()
 
+    # Implement this:
     def initialize_gravity_and_bias(self):
-        """
-        IMPLEMENT THIS!!!!!
-        """
         """
         Initialize the IMU bias and initial orientation based on the 
         first few IMU readings.
         """
         # Initialize the gyro_bias given the current angular and linear velocity
-        ...
+        sum_angular_vel = np.zeros(3)
+        sum_linear_acc = np.zeros(3)
 
-        # Find the gravity in the IMU frame.
-        ...
+        for imu_msg in self.imu_msg_buffer:
+            sum_angular_vel += imu_msg.angular_velocity
+            sum_linear_acc += imu_msg.linear_acceleration
+
+        self.state_server.imu_state.gyro_bias = sum_angular_vel / len(self.imu_msg_buffer)
+
+        # Find the gravity in the IMU frame
+        gravity_imu = sum_linear_acc / len(self.imu_msg_buffer)
+
+        # Normalize the gravity and save to IMUState
+        gravity_norm = np.linalg.norm(gravity_imu)
         
-        # Normalize the gravity and save to IMUState          
-        ...
-
-        # Initialize the initial orientation, so that the estimation
-        # is consistent with the inertial frame.
-        ...
-
+        # Initialize the initial orientation, so that the estimation is consistent with the inertial frame.
+        IMUState.gravity = np.array([0., 0., -gravity_norm])
+        
+        q0_i_w = from_two_vectors(gravity_imu,-IMUState.gravity) 
+        self.state_server.imu_state.orientation = to_quaternion(np.transpose(to_rotation(q0_i_w)))
+    
     # Filter related functions (batch_imu_processing, process_model, predict_new_state)
     def batch_imu_processing(self, time_bound):
         """
