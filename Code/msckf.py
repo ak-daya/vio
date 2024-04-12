@@ -598,37 +598,65 @@ class MSCKF(object):
 
         return H_x, r
 
+    # Implement this
     def measurement_update(self, H, r):
-        """
-        IMPLEMENT THIS!!!!!
-        """
         """
         Section III.B: by stacking multiple observations, we can compute the residuals in equation (6) in "MSCKF" paper 
         """
         # Check if H and r are empty
-        ...
+        if (len(H) == 0 or len(r) == 0):
+            return
 
-        # Decompose the final Jacobian matrix to reduce computational
-        # complexity.
-        ...
+        # Decompose the final Jacobian matrix to reduce computational complexity.
+        if H.shape[0] > H.shape[1]:
+            Q, R = np.linalg.qr(H, mode='reduced') 
+            H_thin = R         
+            r_thin = Q.T @ r   
+        else:
+            H_thin = H   
+            r_thin = r  
 
         # Compute the Kalman gain.
-        ...
+        P = self.state_server.state_cov
+        S = H_thin @ P @ H_thin.T + (self.config.observation_noise * np.eye(len(H_thin)))
+        K_transpose = np.linalg.solve(S, H_thin @ P)
+        K = K_transpose.T
 
         # Compute the error of the state.
-        ...
+        delta_x = K @ r_thin
         
         # Update the IMU state.
-        ...
+        delta_x_imu = delta_x[:21]
+
+        if (np.linalg.norm(delta_x_imu[6:9]) > 0.5 or np.linalg.norm(delta_x_imu[12:15]) > 1.0):
+            print('[Warning] Update change is too large')
+
+        dq_imu = small_angle_quaternion(delta_x_imu[:3])
+        imu_state = self.state_server.imu_state
+        imu_state.orientation = quaternion_multiplication(dq_imu, imu_state.orientation)
+        imu_state.gyro_bias += delta_x_imu[3:6]
+        imu_state.velocity += delta_x_imu[6:9]
+        imu_state.acc_bias += delta_x_imu[9:12]
+        imu_state.position += delta_x_imu[12:15]
+
+        dq_extrinsic = small_angle_quaternion(delta_x_imu[15:18])
+        imu_state.R_imu_cam0 = to_rotation(dq_extrinsic) @ imu_state.R_imu_cam0
+        imu_state.t_cam0_imu += delta_x_imu[18:21]
 
         # Update the camera states.
-        ...
+        for i, (_, cam_state) in enumerate(self.state_server.cam_states.items()):
+            delta_x_cam = delta_x[21+i*6:27+i*6]
+            dq_cam = small_angle_quaternion(delta_x_cam[:3])
+            cam_state.orientation = quaternion_multiplication(
+                dq_cam, cam_state.orientation)
+            cam_state.position += delta_x_cam[3:]
 
         # Update state covariance.
-        ...
+        I_KH = np.eye(len(K)) - K @ H_thin
+        state_cov = I_KH @ self.state_server.state_cov 
 
         # Fix the covariance to be symmetric
-        ...
+        self.state_server.state_cov = 0.5 * (state_cov + state_cov.T)
 
     def gating_test(self, H, r, dof):
         P1 = H @ self.state_server.state_cov @ H.T
