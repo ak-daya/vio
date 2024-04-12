@@ -413,46 +413,76 @@ class MSCKF(object):
         self.state_server.imu_state.velocity = v
         self.state_server.imu_state.position = p
 
+    # Implement this
     def state_augmentation(self, time):
-        """
-        IMPLEMENT THIS!!!!!
-        """
         """
         Compute the state covariance matrix in equation (3) in the "MSCKF" paper.
         """
         # Get the imu_state, rotation from imu to cam0, and translation from cam0 to imu
-        ...
+        R_i_c = self.state_server.imu_state.R_imu_cam0
+        t_c_i = self.state_server.imu_state.t_cam0_imu
 
         # Add a new camera state to the state server.
-        ...
-        
+        R_w_i = to_rotation(self.state_server.imu_state.orientation)
+        R_w_c = R_i_c @ R_w_i
+        t_c_w = self.state_server.imu_state.position + R_w_i.T @ t_c_i
 
+        cam_state = CAMState(self.state_server.imu_state.id)
+        
+        cam_state.timestamp = time
+        cam_state.orientation = to_quaternion(R_w_c)
+        cam_state.position = t_c_w
+        
+        cam_state.orientation_null = cam_state.orientation
+        cam_state.position_null = cam_state.position
+        
+        self.state_server.cam_states[self.state_server.imu_state.id] = cam_state
+        
         # Update the covariance matrix of the state.
         # To simplify computation, the matrix J below is the nontrivial block
         # Appendix B of "MSCKF" paper.
-        ...
+        J = np.zeros((6, 21))
+        J[:3, :3] = R_i_c
+        J[:3, 15:18] = np.eye(3)
+        J[3:6, :3] = skew(R_w_i.T @ t_c_i)
+        J[3:6, 12:15] = np.eye(3)
+        J[3:6, 18:21] = R_w_i.T
 
         # Resize the state covariance matrix.
-        ...
-
+        old_rows, _ = self.state_server.state_cov.shape
+        state_cov = np.zeros((old_rows+6, old_rows+6))
+        state_cov[:old_rows, :old_rows] = self.state_server.state_cov
+        
         # Fill in the augmented state covariance.
-        ...
+        P11 = state_cov[:21, :21]
+        state_cov[old_rows:, :old_rows] = J @ P11
+        state_cov[:old_rows, old_rows:] = state_cov[old_rows:, :old_rows].T
+        state_cov[old_rows:, old_rows:] = J @ P11 @ J.T
 
         # Fix the covariance to be symmetric
-        ...
+        self.state_server.state_cov = 0.5 * (state_cov + state_cov.T)
 
+    # Implement this
     def add_feature_observations(self, feature_msg):
-        """
-        IMPLEMENT THIS!!!!!
-        """
         # get the current imu state id and number of current features
-        ...
+        state_id = self.state_server.imu_state.id
+        curr_feature_num = len(self.map_server)
+        tracked_feature_num = 0
         
         # add all features in the feature_msg to self.map_server
-        ...
+        for feature in feature_msg.features:
+            if feature.id not in self.map_server:
+                # This is a new feature.
+                new_feature = Feature(feature.id, self.optimization_config)
+                new_feature.observations[state_id] = np.array([feature.u0, feature.v0, feature.u1, feature.v1])
+                self.map_server[feature.id] = new_feature
+            else:
+                # This is an old feature.
+                self.map_server[feature.id].observations[state_id] = np.array([feature.u0, feature.v0, feature.u1, feature.v1])
+                tracked_feature_num += 1
 
         # update the tracking rate
-        ...
+        self.tracking_rate = tracked_feature_num / (curr_feature_num + 1e-5)
 
     def measurement_jacobian(self, cam_state_id, feature_id):
         """
