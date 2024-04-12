@@ -243,8 +243,7 @@ class MSCKF(object):
         # is consistent with the inertial frame.
         ...
 
-    # Filter related functions
-    # (batch_imu_processing, process_model, predict_new_state)
+    # Filter related functions (batch_imu_processing, process_model, predict_new_state)
     def batch_imu_processing(self, time_bound):
         """
         IMPLEMENT THIS!!!!!
@@ -298,7 +297,6 @@ class MSCKF(object):
         
         # Update the state correspondes to null space.
         ...
-        
 
     def predict_new_state(self, dt, gyro, acc):
         """
@@ -336,7 +334,6 @@ class MSCKF(object):
         # update the imu state
         ...
 
-    
     def state_augmentation(self, time):
         """
         IMPLEMENT THIS!!!!!
