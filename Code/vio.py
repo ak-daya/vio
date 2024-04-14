@@ -71,7 +71,7 @@ if __name__ == '__main__':
     import argparse
 
     from dataset import EuRoCDataset, DataPublisher
-    # from viewer import Viewer
+    from viewer import Viewer
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', type=str, default='path/to/your/EuRoC_MAV_dataset/MH_01_easy', 
@@ -80,11 +80,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Override parser args
-    args.path = ".\\Data\\MH_01_easy\\"
-    args.view = False
+    args.path = r"/home/venkata/computer_vision/vio/Data/MH_01_easy"
+    args.view = True
 
     if args.view:
-        pass # viewer = Viewer()
+        viewer = Viewer()
     else:
         viewer = None
 
